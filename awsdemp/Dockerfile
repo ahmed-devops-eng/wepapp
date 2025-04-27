@@ -1,22 +1,25 @@
-#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-FROM mcr.microsoft.com/dotnet/aspnet:3.1 AS base
+# Step 1: Build the application
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
-EXPOSE 80
-EXPOSE 443
 
-FROM mcr.microsoft.com/dotnet/sdk:3.1 AS build
-WORKDIR /src
-COPY ["awsdemp/awsdemp.csproj", "awsdemp/"]
-RUN dotnet restore "awsdemp/awsdemp.csproj"
+# Copy project file and restore dependencies
+COPY awsdemp.csproj ./
+RUN dotnet restore
+
+# Copy everything and build the release
 COPY . .
-WORKDIR "/src/awsdemp"
-RUN dotnet build "awsdemp.csproj" -c Release -o /app/build
+RUN dotnet publish -c Release -o out
 
-FROM build AS publish
-RUN dotnet publish "awsdemp.csproj" -c Release -o /app/publish
-
-FROM base AS final
+# Step 2: Create the runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
-COPY --from=publish /app/publish .
+
+# Copy built app from build stage
+COPY --from=build /app/out .
+
+# Expose port
+EXPOSE 5000
+
+# Start the application
 ENTRYPOINT ["dotnet", "awsdemp.dll"]
+
